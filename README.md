@@ -11,7 +11,9 @@ Lien vers la page youtube : https://youtube.com/@SebastienGOSSE
 
 ## 2. Présentation du projet FlyingOhm
 Le projet concerne le code source de la télécommande qui permet :
--De controler le moteur
+-De controler le moteur via le potentiomètre
+-D'afficher les données utiles au pilote (Etat du moteur, autonomie, durée de vol, etc.)
+
 
 ## 3. Fonctionnalités
 ### Etats et modes

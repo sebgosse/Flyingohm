@@ -28,3 +28,7 @@ Le second PCB intègre l'écran ainsi que le bouton poussoir. Ce deuxième PCB e
 ## 4. Impression 3D de la télécommande
 La télécommande est ensuite imprimée en 3D et intègre les PCB, ainsi que le cable électrique connecté au controleur.
 
+<p align="center">
+  <img src="TELECOMMANDE_3D.png" width="350" title="Modélisation 3D de la télcommande">  
+</p>
+

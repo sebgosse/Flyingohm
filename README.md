@@ -28,7 +28,13 @@ Un switch de sécurité est présent sous la télécommande. Si celui ci est act
 ### Signal PWM
 Le signal PWM est l'élément principal à envoyer au controleur du moteur.
 Le PWM a une fréquence de 50Hz (durée du signal de 1000us = 0%, 2000us = 100%)
+
 ### Affichage écran
+L'écran est découpé en différente zone comme présenté dans l'image ci dessous :
+<p align="center">
+  <img src="SPECIFICATION_ECRAN.png.png" width="350" title="ECRAN">  
+</p>
+
 ### Lecture des données du controleur
 Le controleur envoie un signal UART contenant plusieurs informations intéressantes à exploiter, notamment :
 -La tension totale de la batterie

@@ -11,10 +11,17 @@ tft.initr()
 tft.rgb(True)
 tft.rotation(2)
 tft.fill(TFT.WHITE)
+pwm_low_us = 1000 # # durée en us du signal pwm pour être à 0%
+pwm_scale_us = 1000 # durée en us entre la position 0% et 100%
+
 # Configurer la broche du bouton en entrée avec une résistance de tirage vers le haut
 bouton = machine.Pin(15, machine.Pin.IN, machine.Pin.PULL_UP)
+bouton_led = PWM(Pin(14, mode=Pin.OUT))
+#bouton_led.freq(10)
+#bouton_led.duty_u16(65535)
+
 potentiometer = ADC(machine.Pin(27, mode=Pin.IN))  # potentiometer connected to A1, power & ground
-pwm=PWM(Pin(0, mode=Pin.OUT))
+pwm = PWM(Pin(0, mode=Pin.OUT))
 pwm.freq(50)
 pwm.duty_u16(0)
 
@@ -87,13 +94,13 @@ async def display_potentiometer():
         #print(val)      # Display value
         if (val != prec_val):
             print(val)
-            tmp = (val/65535)*900
-            val = 1000 + int(tmp)
-            print(val)
-            pwm.duty_ns(val*1000)
             y = 128*(val/65535)
             tft.fillrect((0,25),(y,5),TFT.BLACK)
-            tft.fillrect((y +1 ,25),(128,5),TFT.WHITE)
+            tft.fillrect((y +1 ,25),(128,5),TFT.WHITE)            
+            tmp = (val/65535)*pwm_scale_us
+            val = pwm_low_us + int(tmp)
+            print(val)
+            pwm.duty_ns(val*1000) #x1000 car c'est en ns
         prec_val = val
         await uasyncio.sleep_ms(5)
 
@@ -218,3 +225,4 @@ class StateMachine:
 if __name__ == "__main__":
     sm = StateMachine()
     uasyncio.run(sm.run())
+

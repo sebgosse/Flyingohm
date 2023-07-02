@@ -1,257 +1,296 @@
-from ST7735 import TFT, TFTColor
-from sysfont import sysfont
-from machine import SPI,Pin,ADC,PWM
 import time
-import uasyncio
+import asyncio
+import board, busio
+import pwmio
+from analogio import AnalogIn
+import terminalio
+from adafruit_simplemath import map_range
 
-spi = SPI(0, baudrate=20000000, polarity=0, phase=0,
-          sck=Pin(2), mosi=Pin(19), miso=None) #sck / tx
-tft=TFT(spi,16,17,18) #Rx/Csn/SCK
-tft.initr()
-tft.rgb(True)
-tft.rotation(2)
-tft.fill(TFT.WHITE)
-pwm_low_us = 1000 # # durée en us du signal pwm pour être à 0%
-pwm_scale_us = 1000 # durée en us entre la position 0% et 100%
+import displayio
+from adafruit_st7735r import ST7735R
+from adafruit_display_text import label
+from adafruit_display_shapes.rect import Rect
+from adafruit_display_shapes.line import Line
 
-# Configurer la broche du bouton en entrée avec une résistance de tirage vers le haut
-bouton = machine.Pin(15, machine.Pin.IN, machine.Pin.PULL_UP)
-bouton_led = PWM(Pin(14, mode=Pin.OUT))
-#bouton_led.freq(10)
-#bouton_led.duty_u16(65535)
+from digitalio import DigitalInOut, Direction, Pull
+import vectorio
+from adafruit_bitmap_font import bitmap_font
 
-buzzer = PWM(Pin(12))
-buzzer_off_delay = 2000 #Durée du bip lorsque le moteur est armé (en ms)
-buzzer_on_delay = 100 #Durée du silence lorsque le moteur est armé (en ms)
+MODE_FONT = bitmap_font.load_font("fonts/ic8x8u.bdf")
 
-potentiometer = ADC(machine.Pin(27, mode=Pin.IN))  # potentiometre connecté à GP27, power & ground
-pwm = PWM(Pin(0, mode=Pin.OUT))
-pwm.freq(50)
-pwm.duty_u16(0)
-
-
-def playtone(frequency):
-    buzzer.duty_u16(5000)
-    buzzer.freq(frequency)
-
-def bequiet():
-    buzzer.duty_u16(0)
-
-async def playsong():
-    tone_state = 1
-    while True :
-        try:            
-            if (tone_state == 0):
-                bequiet()
-                tone_state = 1
-                await uasyncio.sleep_ms(buzzer_off_delay)                
-            else:
-                playtone(500)
-                tone_state = 0
-                await uasyncio.sleep_ms(buzzer_on_delay)
-        except uasyncio.core.CancelledError:  
-             bequiet()
-             return
-    bequiet()
-
-# Fonction qui affiche le logo au démarrage de la télécommande
-def draw_bmp():
-    f=open('INTRO_LOGO.bmp', 'rb')
-    if f.read(2) == b'BM':  #header
-        dummy = f.read(8) #file size(4), creator bytes(4)
-        offset = int.from_bytes(f.read(4), 'little')
-        hdrsize = int.from_bytes(f.read(4), 'little')
-        width = int.from_bytes(f.read(4), 'little')
-        height = int.from_bytes(f.read(4), 'little')
-        if int.from_bytes(f.read(2), 'little') == 1: #planes must be 1
-            depth = int.from_bytes(f.read(2), 'little')
-            if depth == 24 and int.from_bytes(f.read(4), 'little') == 0:#compress method == uncompressed
-                rowsize = (width * 3 + 3) & ~3
-                if height < 0:
-                    height = -height
-                    flip = False
-                else:
-                    flip = True
-                w, h = width, height
-                if w > 128: w = 128
-                if h > 160: h = 160
-                tft._setwindowloc((0,0),(w - 1,h - 1))
-                for row in range(h):
-                    if flip:
-                        pos = offset + (height - 1 - row) * rowsize
-                    else:
-                        pos = offset + row * rowsize
-                    if f.tell() != pos:
-                        dummy = f.seek(pos)
-                    for col in range(w):
-                        bgr = f.read(3)
-                        tft._pushcolor(TFTColor(bgr[2],bgr[1],bgr[0]))
-        tft.text((80, 140), "V0.1", TFT.BLACK, sysfont, 2, nowrap=True)
-
-# Fonction qui dessine des rectangles à l'écran
-def testfillrects(color1, color2):
-    tft.fill(TFT.WHITE);
-    for x in range(tft.size()[0],0,-6):
-        tft.fillrect((tft.size()[state_machine0]//2 - x//2, tft.size()[1]//2 - x/2), (x, x), color1)
-        tft.rect((tft.size()[0]//2 - x//2, tft.size()[1]//2 - x/2), (x, x), color2)
-
-# Fonction qui détecte l'appui court sur le bouton : est utilisé pour le passage de armed à disarmed
-async def detecter_appui_court():
-    print("detecter_appui_court")    
-    # Attendre que le bouton soit relâché
-    while bouton.value() == 0:
-        await uasyncio.sleep_ms(5)
-        pass
-    print("bouton laché")    
-    # Attendre que le bouton soit appuyé    
-    while bouton.value() == 1:
-        await uasyncio.sleep_ms(5)        
-        pass    
-    print("bouton appuyé")    
-    sm.transition("ARMED_TO_DISARMED") 
-    return True
+#PWM Signal is between 1000us (0%) and 2000us (100%) 
+pwm_low_us = 1000 # signal duration of pwm for 0% power
+pwm_high_us = 2000 # signal duration of pwm for 100% power
+pwm_frequency = 50 # Frequency of PWM signal sent
+pwm_low_ratio = (pwm_low_us/((1/pwm_frequency)*1000000)) #Percentage for 0% power motor
+pwm_high_ratio = (pwm_high_us/((1/pwm_frequency)*1000000)) #Percentage for 100% power motor
+pwm_low = pwm_low_ratio * 65535
+pwm_high = pwm_high_ratio * 65535
 
 
-# Fonction qui affiche sous forme de trait plein, la puissance demandé au moteur
-async def display_potentiometer():
-    prec_val = 0
+class Timer:
+    def __init__(self):
+        self.seconds=0
+        self.start_seconds=0
+        
+    async def start_timer(self):
+        while True :
+            if (sm.state == "ARMED"):
+                flying_time_s = int(time.monotonic()) - self.start_seconds
+                screen.timer_text.text = str(flying_time_s//3600) + ":" + str('{:02d}'.format((flying_time_s//60)%60)) + ":" + str('{:02d}'.format(flying_time_s%60))
+            await asyncio.sleep_ms(100)      
+            pass
     
-    while True :
-        #print("pot")
-        val = potentiometer.read_u16()
-        #print(val)      # Display value
-        if (val != prec_val):
-            y = 128*(val/65535)
-            tft.fillrect((0,25),(y,5),TFT.BLACK)
-            tft.fillrect((y +1 ,25),(128,5),TFT.WHITE)            
-            tmp = (val/65535)*pwm_scale_us
-            val = pwm_low_us + int(tmp)
-            #print(val)
-            pwm.duty_ns(val*1000) #x1000 car c'est en ns
-        prec_val = val
-        await uasyncio.sleep_ms(5)
-
-
-
-# Fonction qui détecte la séquence appui long puis court : est utilisé pour le passage de disarmed à armed
-async def detecter_appui_court_long():
-
-    print("detecter_appui_court_long")
-    while True :
-        # Attendre que le bouton soit relâché
-        while bouton.value() == 1:
-            await uasyncio.sleep_ms(5)
-            pass
-        # Attendre l'appui court
-        debut_appui_court = time.ticks_us()
-        while bouton.value() == 0:
-            await uasyncio.sleep_ms(5)
-            pass
-        fin_appui_court = time.ticks_us()
+    def reset_timer(self):
+        self.start_seconds=int(time.monotonic())
         
-        if (time.ticks_diff(fin_appui_court, debut_appui_court) < 200000):
-        
-            # Attendre que le bouton soit relâché
-            while bouton.value() == 1:
-                await uasyncio.sleep_ms(5)                
-                pass
-            
-            # Attendre l'appui long
-            debut_appui_long = time.ticks_us()
-            # Si plus de 600ms entre appui court et appui long, on en fait rien.
-            if (time.ticks_diff(debut_appui_long, debut_appui_court) > 600000):
-                return False
-            
-            # On affiche la barre de progression bleue
+class Button:
+    def __init__(self):
+        self.pin = DigitalInOut(board.GP15)
+        self.pin.direction = Direction.INPUT
+        self.pin.pull = Pull.UP
+
+    # Short pressed button detection (armed to disarmed state)
+    async def short_pressed_disarm(self): 
+        # Wait for button release
+        while self.pin.value == 0:
+            await asyncio.sleep_ms(100)
+            pass
+   
+        # Wait for button press
+        while self.pin.value == 1:
+            await asyncio.sleep_ms(100)        
+            pass    
+   
+        sm.transition("ARMED_TO_DISARMED") 
+        return True
+
+    # Long pressed button detection (disarmed to armed state)
+    async def long_pressed_arm(self):
+
+        nb_cycles = 30 # Number of 100ms cycle needed to switch to armed mode
+        while True :
+            # Wait for button release
+            while (self.pin.value):
+                await asyncio.sleep_ms(100)
             y = 0
-            while bouton.value() == 0:
-                tft.fillrect((0,150),(y,10),TFT.BLUE)
-                y = y+5
-                if (y>128):
+            while (not self.pin.value):
+                screen.rect_arming.width = int(128 * (y/nb_cycles))
+                y = y+1
+                if (y>nb_cycles):
                     break
-                await uasyncio.sleep_ms(5)                
+                await asyncio.sleep_ms(100)      
                 pass
-            fin_appui_long= time.ticks_us()
-
-            # On efface la barre de progression
-            tft.fillrect((0,150),(128,10),TFT.WHITE)
-
-            # Vérifier si la séquence d'appui a été détectée
-            if time.ticks_diff(fin_appui_court, debut_appui_court) < 200000 and time.ticks_diff(fin_appui_long, debut_appui_long) > 1500000:
+            
+            if (y>nb_cycles):
+                screen.rect_arming.width = 0                                 
                 sm.transition("DISARMED_TO_ARMED")
                 return True
+            else:
+                screen.rect_arming.width = 0                 
+
+class Buzzer:
+    def __init__(self):
+        pass
+#         self.pwm = PWM(Pin(12))
+#         self.buzzer_off_delay = 2000 #Durée du bip lorsque le moteur est armé (en ms)
+#         self.buzzer_on_delay = 100 #Durée du silence lorsque le moteur est armé (en ms)
+
+    def playtone(self,frequency):
+        self.pwm.duty_u16(5000)
+        self.pwm.freq(frequency)
+
+    def bequiet(self):
+        self.pwm.duty_u16(0)
+
+    async def playsong(self):
+        tone_state = 1
+        while True :
+            try:            
+                if (tone_state == 0):
+                    self.bequiet()
+                    tone_state = 1
+
+                    await asyncio.sleep_ms(self.buzzer_off_delay)                
+                else:
+                    self.playtone(500)
+                    tone_state = 0
+                    await asyncio.sleep_ms(self.buzzer_on_delay)
+            except asyncio.core.CancelledError:  
+                 self.bequiet()
+                 return
+        self.bequiet()
+
+class Esc:
+    def __init__(self):    
+        self.pwm = pwmio.PWMOut(board.A0, frequency=pwm_frequency, duty_cycle=0)
+        #Set 0% Power
+        self.pwm.duty_cycle = int(pwm_low)
+        print(str(pwm_low))
+            
+    async def send_PWM(self):
+        while True:
+            val = potentiometer.value
+            power = int(map_range(val, 0, 65535, pwm_low , pwm_high))
+            #Set Power regarding potentiometer           
+            self.pwm.duty_cycle = int(pwm_low)     
+            await asyncio.sleep_ms(20)
+            pass
+        
+    def send_PWM_0(self):
+        self.pwm.duty_cycle = int(pwm_low)
+
+
+class Display:
+    def __init__(self):
+        mosi_pin = board.GP11
+        clk_pin = board.GP10
+        reset_pin = board.GP17
+        cs_pin = board.GP18
+        dc_pin = board.GP16
+
+        displayio.release_displays()
+        spi = busio.SPI(clock=clk_pin, MOSI=mosi_pin)
+        display_bus = displayio.FourWire(spi, command=dc_pin, chip_select=cs_pin, reset=reset_pin)
+        self.display = ST7735R(display_bus, width=128, height=160, bgr = True, auto_refresh=True)
+        splash = displayio.Group()
+        self.display.show(splash)
+        
+        ###########
+        ## FIRST GROUP : MODE AND POWER BAR
+        ###########
+        
+        #Draw power bar and arming bar
+        palette = displayio.Palette(1)
+        palette[0] = 0xFF0000
+        self.rect_power = vectorio.Rectangle(pixel_shader=palette, width=1, height=5, x=0, y=14)
+        self.rect_arming = vectorio.Rectangle(pixel_shader=palette, width=1, height=5, x=0, y=8)        
+        # Draw Mode (Armed/Disarmed)
+        text_mode = "INIT"        
+        first_group = displayio.Group(scale=1, x=11, y=24)        
+        self.text_area = label.Label(MODE_FONT, text=text_mode, color=0xFFFFFF, scale=2)
+        first_group.append(self.text_area)  # Subgroup for text scaling
+        first_group.append(self.rect_arming)        
+        first_group.append(self.rect_power)
+        first_group.append(Line(0, 20, 128, 20, 0xFFFFFF))
+        self.rect_arming.width = 0            
+        
+        ###########
+        ## SECOND GROUP : AUTONOMY
+        ###########
+        
+        autonomy = "100%"        
+        second_group = displayio.Group(scale=1, x=11, y=70)        
+        self.text_autonomy = label.Label(MODE_FONT, x=10, text=autonomy, color=0xFFFFFF, scale=3)
+        second_group.append(self.text_autonomy)  # Subgroup for text scaling
+        second_group.append(Line(0, 20, 128, 20, 0xFFFFFF))        
+        
+        ###########
+        ## THIRD GROUP : CONSUMPTION
+        ###########
+
+        consumption = "0W"        
+        third_group = displayio.Group(scale=1, x=11, y=100)        
+        self.text_consumption = label.Label(MODE_FONT, x=40, y=5 , text=consumption, color=0xFFFFFF, scale=2)
+        third_group.append(self.text_consumption)  # Subgroup for text scaling
+        third_group.append(Line(0, 20, 128, 20, 0xFFFFFF))   
+
+        ###########
+        ## FOURTH GROUP : TIMER
+        ###########
+        
+        # Draw timer
+        fourth_group = displayio.Group(scale=1, x=11, y=130)
+        text_timer = "0:00:00"
+        self.timer_text = label.Label(MODE_FONT, text=text_timer, color=0xFFFFFF, scale=2)
+        self.timer_text.y = 15
+        fourth_group.append(self.timer_text)  # Subgroup for text scaling        
+
+
+        splash.append(first_group)
+        splash.append(second_group)
+        splash.append(third_group)        
+        splash.append(fourth_group)        
+
+
+class Potentiometer:
+    def __init__(self):
+        self.adc = AnalogIn(board.A1)
+        self.value = 0
+
+    # Potentiometer reading  
+    async def read(self):
+        while True:
+            self.value = self.adc.value
+            # Update Power Bar on screen
+            screen.rect_power.width = int((self.value / 65536) * 128)
+            await asyncio.sleep_ms(20)
+            pass        
 
 class StateMachine:
     def __init__(self):
         self.state = "INIT"
+        asyncio.create_task(potentiometer.read())
+        self.start_timer_task = asyncio.create_task(timer.start_timer())
         print("INIT State")
         
     def transition(self, event):
         if self.state == "INIT" and event == "INIT_TO_DISARMED":
             self.state = "DISARMED"
-            #White Screen
-            tft.fill(TFT.WHITE)
+            print("_INIT_TO_DISARM")
             self.display_state()
-            uasyncio.create_task(detecter_appui_court_long())            
-            uasyncio.create_task(display_potentiometer())            
+            asyncio.create_task(button.long_pressed_arm())            
             print("Transition from INIT to DISARMED")
         elif self.state == "DISARMED" and event == "DISARMED_TO_ARMED":
             self.state = "ARMED"
-            tft.fill(TFT.WHITE)
-            self.play_task = uasyncio.create_task(playsong())   
-            uasyncio.create_task(detecter_appui_court())                        
+            self.display_state()
+            timer.reset_timer()              
+            asyncio.create_task(button.short_pressed_disarm())
+            self.send_pwm_task = asyncio.create_task(esc.send_PWM())               
             print("Transition from DISARMED to ARMED")
         elif self.state == "ARMED" and event == "ARMED_TO_DISARMED":
             self.state = "DISARMED"
-            self.play_task.cancel()
-            tft.fill(TFT.WHITE)
-            uasyncio.create_task(detecter_appui_court_long())               
+            self.send_pwm_task.cancel()
+            esc.send_PWM_0()
+            self.display_state()
+            asyncio.create_task(button.long_pressed_arm())               
             print("Transition from ARMED to DISARMED")
         else:
             print("Invalid transition")
-                
-    def read_potentiometre(self):
-        # Setup the potentiometer input
-        #potentiometer = analogio.AnalogIn(board.A0)
-        print("Potentiometer read")
-        time.sleep_ms(1)  # Wait for 1ms before reading again
-    
-    def display_info(self):
-        if (self.state == "ARMED"):
-            info="Appui court puis long pour armer"
-        elif (self.state == "DISARMED"):
-            info="Appui court pour désarmer"
-        else:
-            info=""
-        tft.text((0, 40), info , TFT.BLACK, sysfont, 2, nowrap=True)
-            
+
             
     def display_state(self):
         if (self.state == "ARMED"):
-            color=TFT.RED
+            screen.text_area.x = 20
+            screen.text_area.color = 0xFF0000
+            screen.text_area.text = "ACTIF"
         elif (self.state == "DISARMED"):
-            color=TFT.BLUE
+            screen.text_area.x = 0            
+            screen.text_area.color = 0x00FF00
+            screen.text_area.text= "INACTIF"
         else:
-            color=TFT.BLACK
-        tft.text((0, 0), self.state , color, sysfont, 3, nowrap=True)
+            screen.text_area.x = 0            
+            screen.text_area.color = 0xFFFFFF
+            screen.text_area.text= "UNKNOWN"
 
     async def run(self):
         while True:
             if self.state == "INIT":
-                draw_bmp()
-                await uasyncio.sleep(1)
+                #screen.draw_bmp()
+                print("INIT")
                 self.transition("INIT_TO_DISARMED")
-
-            elif self.state == "DISARMED":
-                self.display_state()                
-                await uasyncio.sleep_ms(1)
-
-            elif self.state == "ARMED":
-                self.display_state()
-                await uasyncio.sleep_ms(1)                    
-
+                print("INIT TO DISARM")                
+            await asyncio.sleep_ms(100)
+                 
 
 if __name__ == "__main__":
+
+    timer = Timer()
+    esc = Esc()
+    potentiometer = Potentiometer()
+    screen = Display()
+    button = Button()
+    buzzer = Buzzer()
     sm = StateMachine()
-    uasyncio.run(sm.run())
+    asyncio.run(sm.run())
 

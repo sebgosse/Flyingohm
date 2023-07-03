@@ -62,8 +62,6 @@ The controller sends a UART signal containing several interesting information to
 Controller documentation reference: https://docs.powerdrives.net/products/hv_pro/uart-telemetry-output
 
 
-[<img src="Ressources/3D_REMOTE_PCB.png" width="50%">](Ressources/remote-screen-video.mp4 "Now in Android: 55")
-
 ## 4. BOM and Pinout
 The project consists of (among others):
 

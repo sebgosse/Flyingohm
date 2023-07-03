@@ -47,7 +47,7 @@ The PWM has a frequency of 50Hz (signal duration of 1000us = 0%, 2000us = 100%)
 ### Screen display
 The screen is divided into different areas as shown in the image below:
 <p align="center">
-  <img src="SPECIFICATION_ECRAN.png" width="350" title="SCREEN">
+  <img src="Ressources/SCREEN_SPECIFICATIONS.png" width="350" title="SCREEN">
 </p>
 
 ### Reading controller data
@@ -79,20 +79,20 @@ The project consists of (among others):
 ## 5.PCB
 Two PCBs exist: the first for the main handle which contains the pico pi and the potentiometer.
 <p align="center">
-  <img src="PCB_POIGNEE_3D_RUN1.png" width="350" title="3D representation of the main PCB">
-  <img src="PCB_POIGNEE_2D_RUN1.png" width="350" title="Main PCB routing">
+  <img src="Ressources/3D_REMOTE_PCB.png" width="350" title="3D representation of the main PCB">
+  <img src="Ressources/2D_REMOTE_PCB.png" width="350" title="Main PCB routing">
 </p>
 
 The second PCB integrates the screen as well as the push button. This second PCB is soldered vertically on the main PCB.
 <p align="center">
-  <img src="PCB_ECRAN_3D_RUN1.png" width="350" title="3D representation of the screen PCB">
+  <img src="Ressources/3D_SCREEN_PCB.png" width="350" title="3D representation of the screen PCB">
 </p>
 
 ## 6. 3D printing of the remote control
 The remote control is then printed in 3D and integrates the PCBs, as well as the electric cable connected to the controller.
 <p align="center">
-  <img src="IMPRESSION_TELECOMMANDE.jpg" width="350" title="Remote control printing">
-  <img src="TELECOMMANDE_3D.png" width="350" title="3D model of the remote control">
+  <img src="Ressources/REMOTE_PRINT.jpg" width="350" title="Remote control printing">
+  <img src="Ressources/3D_REMOTE.png" width="350" title="3D model of the remote control">
 </p>
 
 ## Environment, code and flash of the raspberry pico pi

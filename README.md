@@ -88,6 +88,12 @@ The second PCB integrates the screen as well as the push button. This second PCB
   <img src="Ressources/3D_SCREEN_PCB.png" width="350" title="3D representation of the screen PCB">
 </p>
 
+Here is the wiring principle :
+<p align="center">
+  <img src="Ressources/Synoptique_remote.jpg" width="800" title="Remote wiring">
+</p>
+
+
 ## 6. 3D printing of the remote control
 The remote control is then printed in 3D and integrates the PCBs, as well as the electric cable connected to the controller.
 <p align="center">

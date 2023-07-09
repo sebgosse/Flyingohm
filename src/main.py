@@ -123,7 +123,7 @@ class Buzzer:
 
 class Esc:
     def __init__(self):    
-        self.pwm = pwmio.PWMOut(board.A0, frequency=pwm_frequency, duty_cycle=0)
+        self.pwm = pwmio.PWMOut(board.GP0, frequency=pwm_frequency, duty_cycle=0)
         #Set 0% Power
         self.pwm.duty_cycle = int(pwm_low)
         print(str(pwm_low))
@@ -133,7 +133,7 @@ class Esc:
             val = potentiometer.value
             power = int(map_range(val, 0, 65535, pwm_low , pwm_high))
             #Set Power regarding potentiometer           
-            self.pwm.duty_cycle = int(pwm_low)     
+            self.pwm.duty_cycle = int(power)     
             await asyncio.sleep_ms(20)
             pass
         

@@ -98,7 +98,7 @@ class Button:
 
 
 class Buzzer:
-    def __init__(self): # ! useless
+    def __init__(self):  # ! useless
         pass
 
     #         self.pwm = PWM(Pin(12))

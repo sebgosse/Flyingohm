@@ -23,14 +23,17 @@ MODE_FONT = bitmap_font.load_font("fonts/ic8x8u.bdf")
 
 class Timer:
     def __init__(self):
-        self.seconds = 0
-        self.start_seconds = 0
+        self.seconds: int = 0
+        self.start_seconds: int = 0
 
     async def start_timer(self) -> None:
+        """
+        Start the timer
+        """
         while True:
             if sm.state == SmStatus.ARMED:
-                flying_time_s = int(time.monotonic()) - self.start_seconds
-                screen.timer_text.text = (
+                flying_time_s: int = int(time.monotonic()) - self.start_seconds
+                screen.timer_text.text: str = (
                     f"{str(flying_time_s // 3600)}:"
                     + "{:02d}".format((flying_time_s // 60) % 60)
                     + ":"
@@ -39,7 +42,7 @@ class Timer:
             await asyncio.sleep_ms(100)
 
     def reset_timer(self) -> None:
-        self.start_seconds = int(time.monotonic())
+        self.start_seconds: int = int(time.monotonic())
 
 
 class Button:
@@ -50,6 +53,12 @@ class Button:
 
     # Short pressed button detection (armed to disarmed state)
     async def short_pressed_disarm(self) -> bool:
+        """
+        Check if button is disarm
+
+        :return: return True if button is disarm
+        :rtype: bool
+        """
         # Wait for button release
         while self.pin.value == 0:
             await asyncio.sleep_ms(100)
@@ -63,12 +72,18 @@ class Button:
 
     # Long pressed button detection (disarmed to armed state)
     async def long_pressed_arm(self) -> bool:
-        nb_cycles = 30  # Number of 100ms cycle needed to switch to armed mode
+        """
+        Check if button is pressed
+
+        :return: return True if button is pressed
+        :rtype: bool
+        """
+        nb_cycles: int = 30  # Number of 100ms cycle needed to switch to armed mode
         while True:
             # Wait for button release
             while self.pin.value:
                 await asyncio.sleep_ms(100)
-            y = 0
+            y: int = 0
             while not self.pin.value:
                 screen.rect_arming.width = int(128 * (y / nb_cycles))
                 y = y + 1
@@ -76,14 +91,14 @@ class Button:
                     break
                 await asyncio.sleep_ms(100)
 
-            screen.rect_arming.width = 0
+            screen.rect_arming.width: int = 0
             if y > nb_cycles:
                 sm.transition(EventStatus.DISARMED_TO_ARMED)
                 return True
 
 
 class Buzzer:
-    def __init__(self):
+    def __init__(self): # ! useless
         pass
 
     #         self.pwm = PWM(Pin(12))
@@ -91,14 +106,26 @@ class Buzzer:
     #         self.buzzer_on_delay = 100 #Durée du silence lorsque le moteur est armé (en ms)
 
     def playtone(self, frequency: int) -> None:
+        """
+        Play the specified frequency
+
+        :param frequency: frequency of the sound
+        :type frequency: int
+        """
         self.pwm.duty_u16(5000)
         self.pwm.freq(frequency)
 
     def bequiet(self) -> None:
+        """
+        Sound off the buzzer
+        """
         self.pwm.duty_u16(0)
 
     async def playsong(self) -> None:
-        tone_state = 1
+        """
+        Play a sound with buzzer
+        """
+        tone_state: int = 1
         while True:
             try:
                 if tone_state == 0:
@@ -121,10 +148,13 @@ class Esc:
             board.GP0, frequency=constant.pwm_frequency, duty_cycle=0
         )
         # Set 0% Power
-        self.pwm.duty_cycle = int(constant.pwm_low)
+        self.pwm.duty_cycle: int = int(constant.pwm_low)
         print(constant.pwm_low)
 
     async def send_PWM(self) -> None:
+        """
+        Send PWM value
+        """
         while True:
             val = potentiometer.value
             power = int(map_range(val, 0, 65535, constant.pwm_low, constant.pwm_high))
@@ -133,7 +163,10 @@ class Esc:
             await asyncio.sleep_ms(20)
 
     def send_PWM_0(self) -> None:
-        self.pwm.duty_cycle = int(constant.pwm_low)
+        """
+        Send PWM low value
+        """
+        self.pwm.duty_cycle: int = int(constant.pwm_low)
 
 
 class Display:
@@ -228,6 +261,9 @@ class Potentiometer:
 
     # Potentiometer reading
     async def read(self) -> None:
+        """
+        Read potentiometer values
+        """
         while True:
             self.value = self.adc.value
             # Update Power Bar on screen
@@ -237,12 +273,18 @@ class Potentiometer:
 
 class StateMachine:
     def __init__(self):
-        self.state = SmStatus.ARMED
+        self.state: SmStatus = SmStatus.ARMED
         asyncio.create_task(potentiometer.read())
         self.start_timer_task = asyncio.create_task(timer.start_timer())
         print("INIT State")
 
-    def transition(self, event: str) -> None:
+    def transition(self, event: EventStatus) -> None:
+        """
+        Update the state of the state machine
+
+        :param event: event status (INIT_TO_DISARMED, DISARMED_TO_ARMED, ARMED_TO_DISARMED)
+        :type event: EventStatus
+        """
         if self.state == SmStatus.ARMED and event == EventStatus.INIT_TO_DISARMED:
             self.state = SmStatus.DISARMED
             print("_INIT_TO_DISARM")
@@ -258,7 +300,10 @@ class StateMachine:
             print("Invalid transition")
 
     def arme_state_machine(self) -> None:
-        self.state = SmStatus.ARMED
+        """
+        Arme state machine
+        """
+        self.state: SmStatus = SmStatus.ARMED
         self.display_state()
         timer.reset_timer()
         asyncio.create_task(button.short_pressed_disarm())
@@ -266,11 +311,20 @@ class StateMachine:
         print("Transition from DISARMED to ARMED")
 
     def display_state_and_create_task(self, text: str) -> None:
+        """
+        Display the SM state an create task
+
+        :param text: text to log
+        :type text: str
+        """
         self.display_state()
         asyncio.create_task(button.long_pressed_arm())
         print(text)
 
     def display_state(self) -> None:
+        """
+        Update the screen with the state machine status
+        """
         if self.state == SmStatus.ARMED:
             self.update_screen(20, 0xFF0000, ScreenStatus.ACTIF.value)
         elif self.state == SmStatus.DISARMED:
@@ -281,11 +335,24 @@ class StateMachine:
     def update_screen(
         self, text_position: int, text_color: int, screen_status: str
     ) -> None:
+        """
+        Upate the screen parameters
+
+        :param text_position: text position in the screen
+        :type text_position: int
+        :param text_color: text color in hexa
+        :type text_color: int
+        :param screen_status: text to display
+        :type screen_status: str
+        """
         screen.text_area.x = text_position
         screen.text_area.color = text_color
         screen.text_area.text = screen_status
 
     async def run(self):
+        """
+        Main function
+        """
         while True:
             if self.state == SmStatus.ARMED:
                 # screen.draw_bmp()

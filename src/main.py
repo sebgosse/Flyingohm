@@ -16,7 +16,7 @@ from digitalio import DigitalInOut, Direction, Pull
 import vectorio
 from adafruit_bitmap_font import bitmap_font
 from utils import constant
-from utils.enum import SmStatus
+from utils.enum import SmStatus, EventStatus, ScreenStatus
 
 MODE_FONT = bitmap_font.load_font("fonts/ic8x8u.bdf")
 
@@ -58,7 +58,7 @@ class Button:
         while self.pin.value == 1:
             await asyncio.sleep_ms(100)
 
-        sm.transition("ARMED_TO_DISARMED")
+        sm.transition(EventStatus.ARMED_TO_DISARMED)
         return True
 
     # Long pressed button detection (disarmed to armed state)
@@ -78,7 +78,7 @@ class Button:
 
             screen.rect_arming.width = 0
             if y > nb_cycles:
-                sm.transition("DISARMED_TO_ARMED")
+                sm.transition(EventStatus.DISARMED_TO_ARMED)
                 return True
 
 
@@ -243,13 +243,13 @@ class StateMachine:
         print("INIT State")
 
     def transition(self, event: str) -> None:
-        if self.state == SmStatus.ARMED and event == "INIT_TO_DISARMED":
+        if self.state == SmStatus.ARMED and event == EventStatus.INIT_TO_DISARMED:
             self.state = SmStatus.DISARMED
             print("_INIT_TO_DISARM")
             self.display_state_and_create_task("Transition from INIT to DISARMED")
-        elif self.state == SmStatus.DISARMED and event == "DISARMED_TO_ARMED":
+        elif self.state == SmStatus.DISARMED and event == EventStatus.DISARMED_TO_ARMED:
             self.arme_state_machine()
-        elif self.state == SmStatus.ARMED and event == "ARMED_TO_DISARMED":
+        elif self.state == SmStatus.ARMED and event == EventStatus.ARMED_TO_DISARMED:
             self.state = SmStatus.DISARMED
             self.send_pwm_task.cancel()
             esc.send_PWM_0()
@@ -272,11 +272,11 @@ class StateMachine:
 
     def display_state(self) -> None:
         if self.state == SmStatus.ARMED:
-            self.update_screen(20, 0xFF0000, "ACTIF")
+            self.update_screen(20, 0xFF0000, ScreenStatus.ACTIF.value)
         elif self.state == SmStatus.DISARMED:
-            self.update_screen(0, 0x00FF00, "INACTIF")
+            self.update_screen(0, 0x00FF00, ScreenStatus.INACTIF.value)
         else:
-            self.update_screen(0, 0xFFFFFF, "UNKNOWN")
+            self.update_screen(0, 0xFFFFFF, ScreenStatus.UNKNOWN.value)
 
     def update_screen(
         self, text_position: int, text_color: int, screen_status: str
@@ -290,7 +290,7 @@ class StateMachine:
             if self.state == SmStatus.ARMED:
                 # screen.draw_bmp()
                 print("INIT")
-                self.transition("INIT_TO_DISARMED")
+                self.transition(EventStatus.INIT_TO_DISARMED)
                 print("INIT TO DISARM")
             await asyncio.sleep_ms(100)
 

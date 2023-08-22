@@ -122,7 +122,8 @@ class Buzzer:
         self.bequiet()
 
 class Esc:
-    def __init__(self):    
+    def __init__(self):
+        self.uart = busio.UART(rx=board.GP13, baudrate=115200)        
         self.pwm = pwmio.PWMOut(board.GP0, frequency=pwm_frequency, duty_cycle=0)
         #Set 0% Power
         self.pwm.duty_cycle = int(pwm_low)
@@ -130,6 +131,11 @@ class Esc:
             
     async def send_PWM(self):
         while True:
+            #data = self.uart.read(1)  # read up to 32 bytes
+            #if data is not None:
+                # convert bytearray to string
+                #data_string = ''.join([chr(b) for b in data])
+                #print(data_string, end="")                
             val = potentiometer.value
             power = int(map_range(val, 0, 65535, pwm_low , pwm_high))
             #Set Power regarding potentiometer           
@@ -162,9 +168,11 @@ class Display:
         
         #Draw power bar and arming bar
         palette = displayio.Palette(1)
+        palette_vert = displayio.Palette(1)
         palette[0] = 0xFF0000
+        palette_vert[0] = 0x00FF00        
         self.rect_power = vectorio.Rectangle(pixel_shader=palette, width=1, height=5, x=0, y=14)
-        self.rect_arming = vectorio.Rectangle(pixel_shader=palette, width=1, height=5, x=0, y=8)        
+        self.rect_arming = vectorio.Rectangle(pixel_shader=palette_vert, width=1, height=5, x=0, y=8)        
         # Draw Mode (Armed/Disarmed)
         text_mode = "INIT"        
         first_group = displayio.Group(scale=1, x=11, y=24)        
@@ -283,14 +291,14 @@ class StateMachine:
             await asyncio.sleep_ms(100)
                  
 
-if __name__ == "__main__":
+#if __name__ == "__main__":
 
-    timer = Timer()
-    esc = Esc()
-    potentiometer = Potentiometer()
-    screen = Display()
-    button = Button()
-    buzzer = Buzzer()
-    sm = StateMachine()
-    asyncio.run(sm.run())
+timer = Timer()
+esc = Esc()
+potentiometer = Potentiometer()
+screen = Display()
+button = Button()
+buzzer = Buzzer()
+sm = StateMachine()
+asyncio.run(sm.run())
 

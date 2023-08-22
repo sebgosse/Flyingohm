@@ -46,7 +46,7 @@ Le PWM a une fréquence de 50Hz (durée du signal de 1000us = 0%, 2000us = 100%)
 ### Affichage écran
 L'écran est découpé en différente zone comme présenté dans l'image ci dessous :
 <p align="center">
-  <img src="SPECIFICATION_ECRAN.png" width="350" title="ECRAN">  
+  <img src="Ressources/SPECIFICATION_ECRAN.png" width="350" title="ECRAN">  
 </p>
 
 ### Lecture des données du controleur
